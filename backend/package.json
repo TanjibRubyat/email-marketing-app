@@ -1,0 +1,26 @@
+{
+  "name": "email-marketing-backend",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "ts-node-dev --respawn src/server.ts",
+    "worker": "ts-node-dev --respawn src/queue/sendWorker.ts",
+    "migrate": "ts-node src/db/migrate.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5",
+    "bullmq": "^5.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "@types/node": "^20.14.10",
+    "@types/express": "^4.17.21",
+    "@types/pg": "^8.11.6",
+    "@types/cors": "^2.8.17"
+  }
+}
