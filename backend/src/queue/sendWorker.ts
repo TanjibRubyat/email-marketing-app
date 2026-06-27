@@ -3,15 +3,18 @@ import dotenv from 'dotenv';
 import { redisConnection } from './connection';
 import { pool } from '../db/pool';
 import { SMTPClient, SMTPError } from '../smtp/client';
+import { injectTracking } from '../tracking/injectTracking';
 import type { SendJobData } from './sendQueue';
 
 dotenv.config();
 
 const SMTP_HOST = process.env.SMTP_HOST ?? '127.0.0.1';
 const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 2525;
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL ?? 'http://localhost:4000';
 
 interface SendRow {
   id: number;
+  tracking_token: string;
   subject: string;
   from_name: string;
   from_email: string;
@@ -24,7 +27,7 @@ async function processSend(job: Job<SendJobData>): Promise<void> {
   const { sendId } = job.data;
 
   const { rows } = await pool.query<SendRow>(
-    `SELECT s.id, c.subject, c.from_name, c.from_email, c.html_body, c.text_body, ct.email
+    `SELECT s.id, s.tracking_token, c.subject, c.from_name, c.from_email, c.html_body, c.text_body, ct.email
      FROM sends s
      JOIN campaigns c ON c.id = s.campaign_id
      JOIN contacts ct ON ct.id = s.contact_id
@@ -38,6 +41,10 @@ async function processSend(job: Job<SendJobData>): Promise<void> {
     return;
   }
 
+  const trackedHtml = send.html_body
+    ? injectTracking(send.html_body, send.tracking_token, PUBLIC_BASE_URL)
+    : undefined;
+
   // One fresh connection per send. Fine for a learning project talking to a
   // single local relay; a production worker would pool/reuse connections
   // per destination domain to avoid a handshake-per-email overhead.
@@ -49,6 +56,7 @@ async function processSend(job: Job<SendJobData>): Promise<void> {
       to: [send.email],
       subject: send.subject,
       body: send.text_body ?? stripHtml(send.html_body ?? ''),
+      htmlBody: trackedHtml,
     });
     await client.quit();
 

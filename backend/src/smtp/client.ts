@@ -29,6 +29,7 @@ export interface SendMailOptions {
   to: string[];
   subject: string;
   body: string;
+  htmlBody?: string;
   clientHost?: string;
   headers?: Record<string, string>;
 }
@@ -173,18 +174,58 @@ export class SMTPClient {
   }
 }
 
-/** Builds the RFC 5322 message (headers + body) with dot-stuffing and the end-of-data marker. */
+/**
+ * Builds the message: headers + body, ending with the dot-stuffed
+ * terminator. When htmlBody is provided, builds a proper
+ * multipart/alternative MIME message (a plain-text part AND an HTML part)
+ * rather than just dumping HTML into a body with no Content-Type - a mail
+ * client with no Content-Type header has no way to know it should render
+ * HTML instead of showing the raw tags.
+ */
 function buildMessage(opts: SendMailOptions): string {
   const headerLines = [
     `Subject: ${opts.subject}`,
     `From: ${opts.from}`,
     `To: ${opts.to.join(', ')}`,
+    'MIME-Version: 1.0',
     ...Object.entries(opts.headers ?? {}).map(([key, value]) => `${key}: ${value}`),
   ];
 
-  const bodyLines = opts.body
-    .split(/\r\n|\n/)
-    .map((line) => (line.startsWith('.') ? '.' + line : line)); // dot-stuffing
+  let bodySection: string;
 
-  return [...headerLines, '', ...bodyLines].join('\r\n') + '\r\n.\r\n';
+  if (opts.htmlBody) {
+    const boundary = `----=_Boundary_${randomBoundaryToken()}`;
+    headerLines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+
+    bodySection = [
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      opts.body,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      opts.htmlBody,
+      '',
+      `--${boundary}--`,
+    ].join('\r\n');
+  } else {
+    headerLines.push('Content-Type: text/plain; charset=utf-8');
+    bodySection = opts.body;
+  }
+
+  // Dot-stuffing applies to the WHOLE body section (every line, MIME
+  // boundaries included) - the SMTP server has no concept of MIME, it just
+  // sees raw lines, so any line starting with "." anywhere must be escaped.
+  const dotStuffed = bodySection
+    .split(/\r\n|\n/)
+    .map((line) => (line.startsWith('.') ? '.' + line : line))
+    .join('\r\n');
+
+  return [...headerLines, '', dotStuffed].join('\r\n') + '\r\n.\r\n';
+}
+
+function randomBoundaryToken(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }

@@ -189,3 +189,26 @@ campaignsRouter.get(
     res.json(rows);
   })
 );
+
+// GET /api/campaigns/:id/stats - send outcomes plus open/click counts
+campaignsRouter.get(
+  '/:id/stats',
+  asyncHandler(async (req, res) => {
+    const { rows } = await pool.query(
+      `SELECT
+         COUNT(DISTINCT s.id) FILTER (WHERE s.status = 'sent')    AS sent,
+         COUNT(DISTINCT s.id) FILTER (WHERE s.status = 'bounced') AS bounced,
+         COUNT(DISTINCT s.id) FILTER (WHERE s.status = 'failed')  AS failed,
+         COUNT(DISTINCT s.id) FILTER (WHERE s.status = 'pending') AS pending,
+         COUNT(DISTINCT e.send_id) FILTER (WHERE e.type = 'open')  AS unique_opens,
+         COUNT(*)                 FILTER (WHERE e.type = 'open')  AS total_opens,
+         COUNT(DISTINCT e.send_id) FILTER (WHERE e.type = 'click') AS unique_clicks,
+         COUNT(*)                 FILTER (WHERE e.type = 'click') AS total_clicks
+       FROM sends s
+       LEFT JOIN events e ON e.send_id = s.id
+       WHERE s.campaign_id = $1`,
+      [req.params.id]
+    );
+    res.json(rows[0]);
+  })
+);

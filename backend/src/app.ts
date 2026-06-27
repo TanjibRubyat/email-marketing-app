@@ -3,6 +3,7 @@ import cors from 'cors';
 import { contactsRouter } from './routes/contacts';
 import { listsRouter } from './routes/lists';
 import { campaignsRouter } from './routes/campaigns';
+import { trackingRouter } from './routes/tracking';
 
 export const app = express();
 
@@ -14,6 +15,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/contacts', contactsRouter);
 app.use('/api/lists', listsRouter);
 app.use('/api/campaigns', campaignsRouter);
+app.use('/track', trackingRouter);
 
 // Catch-all error handler. Must have 4 params (including unused ones) for
 // Express to recognise it as an error handler rather than a normal route.
