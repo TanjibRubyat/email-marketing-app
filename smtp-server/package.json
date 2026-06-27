@@ -1,0 +1,17 @@
+{
+  "name": "smtp-server",
+  "version": "0.1.0",
+  "description": "Hand-rolled SMTP server built from raw TCP sockets, no SMTP libraries.",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/server.ts",
+    "test-client": "ts-node src/test-client.ts",
+    "send-demo": "ts-node src/send-demo.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.14.10"
+  }
+}
