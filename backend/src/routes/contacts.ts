@@ -44,6 +44,10 @@ contactsRouter.post(
         // unique_violation - this user already has a contact with this email
         return res.status(409).json({ error: 'Contact with this email already exists' });
       }
+      if (err.code === '23503') {
+        // foreign_key_violation - the referenced user_id doesn't exist
+        return res.status(400).json({ error: `No user with id ${user_id} exists` });
+      }
       throw err;
     }
   })

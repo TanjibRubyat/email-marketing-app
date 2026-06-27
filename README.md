@@ -57,32 +57,24 @@ docker-compose.yml   Local Postgres + Redis.
 
 ## Running locally
 
-Requires Docker Desktop, Node.js 20+.
+Requires Docker Desktop.
+
+**Everything at once** (Postgres, Redis, the SMTP server, the API, the queue worker, and the frontend dev server):
 
 ```bash
-docker compose up -d              # starts Postgres + Redis
-
-cd backend
-cp .env.example .env
-npm install
-npm run migrate                   # applies the database schema
+docker compose up -d --build
 ```
 
-Then, in three separate terminals:
+First run takes a few minutes (building 4 images). After that, `docker compose up -d` is fast since images are cached - only changed code triggers a rebuild.
 
-```bash
-# Terminal 1 - the SMTP relay
-cd smtp-server && npm install && npm run dev
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:4000`
+- Logs for any one service: `docker compose logs -f api` (swap `api` for `worker`, `smtp-server`, `frontend`, etc.)
+- Stop everything: `docker compose down`
 
-# Terminal 2 - the API
-cd backend && npm run dev
+Source code is bind-mounted into each container, so edits on your machine are picked up by the dev servers running inside - no rebuild needed for code changes, only for dependency changes (`docker compose up -d --build` after adding a package).
 
-# Terminal 3 - the queue worker
-cd backend && npm run worker
-```
-
-API available at `http://localhost:4000`. See `backend/src/routes/` for
-available endpoints (contacts, lists, campaigns, send triggering).
+**Without Docker** (running each piece natively) is still possible - see `backend/.env.example` and `smtp-server`/`backend`/`frontend` each have their own `npm run dev`, but Docker is the easier path now that all 4 services are containerized.
 
 ## Status
 

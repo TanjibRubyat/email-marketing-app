@@ -10,6 +10,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d email_marketing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7
@@ -18,7 +23,103 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  smtp-server:
+    build: ./smtp-server
+    restart: unless-stopped
+    ports:
+      - "2525:2525"
+    volumes:
+      - ./smtp-server:/app
+      - smtp_node_modules:/app/node_modules
+
+  # One-off job: applies any new migrations, then exits. api/worker wait
+  # for this to finish successfully before they start.
+  migrate:
+    build: ./backend
+    command: npm run migrate
+    environment:
+      DATABASE_URL: postgres://app:app_password@postgres:5432/email_marketing
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+
+  api:
+    build: ./backend
+    command: npm run dev
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgres://app:app_password@postgres:5432/email_marketing
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: smtp-server
+      SMTP_PORT: "2525"
+      PUBLIC_BASE_URL: http://localhost:4000
+      PORT: "4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+
+  worker:
+    build: ./backend
+    command: npm run worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://app:app_password@postgres:5432/email_marketing
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: smtp-server
+      SMTP_PORT: "2525"
+      PUBLIC_BASE_URL: http://localhost:4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      smtp-server:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      # This runs in the BROWSER, not inside the docker network - so it
+      # must point at the host-mapped port (localhost:4000), never the
+      # internal service name "api". Same reasoning as PUBLIC_BASE_URL
+      # above: anything executed outside the containers needs a
+      # host-reachable address, not a docker-internal one.
+      VITE_API_BASE_URL: http://localhost:4000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - api
 
 volumes:
   postgres_data:
   redis_data:
+  backend_node_modules:
+  smtp_node_modules:
+  frontend_node_modules:

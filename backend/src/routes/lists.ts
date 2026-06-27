@@ -34,11 +34,18 @@ listsRouter.post(
       return res.status(400).json({ error: 'user_id and name are required' });
     }
 
-    const { rows } = await pool.query(
-      `INSERT INTO lists (user_id, name, description) VALUES ($1, $2, $3) RETURNING *`,
-      [user_id, name, description ?? null]
-    );
-    res.status(201).json(rows[0]);
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO lists (user_id, name, description) VALUES ($1, $2, $3) RETURNING *`,
+        [user_id, name, description ?? null]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err: any) {
+      if (err.code === '23503') {
+        return res.status(400).json({ error: `No user with id ${user_id} exists` });
+      }
+      throw err;
+    }
   })
 );
 

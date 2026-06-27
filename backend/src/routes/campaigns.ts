@@ -55,8 +55,11 @@ campaignsRouter.post(
 
       await client.query('COMMIT');
       res.status(201).json(campaign);
-    } catch (err) {
+    } catch (err: any) {
       await client.query('ROLLBACK');
+      if (err.code === '23503') {
+        return res.status(400).json({ error: `No user with id ${user_id} exists, or one of the list_ids is invalid` });
+      }
       throw err;
     } finally {
       client.release();
